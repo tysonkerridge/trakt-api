@@ -1,5 +1,11 @@
 import { authMetadata, builder } from '../_internal/builder.ts';
 import { idParamsSchema } from '../_internal/request/idParamsSchema.ts';
+import {
+  episodeIdsRequestSchema,
+  movieIdsRequestSchema,
+  seasonIdsRequestSchema,
+  showIdsRequestSchema,
+} from '../_internal/request/idsRequestSchema.ts';
 import { z } from '../_internal/z.ts';
 
 const noteItemSchema = z
@@ -7,6 +13,32 @@ const noteItemSchema = z
     type: z.string().optional(),
   })
   .passthrough();
+
+const noteCreateRequestSchema = z.object({
+  movie: z.object({ ids: movieIdsRequestSchema }).nullish(),
+  show: z.object({ ids: showIdsRequestSchema }).nullish(),
+  season: z.object({ ids: seasonIdsRequestSchema }).nullish(),
+  episode: z.object({ ids: episodeIdsRequestSchema }).nullish(),
+  person: z
+    .object({
+      ids: z.object({
+        trakt: z.number().int().nullish(),
+        slug: z.string().nullish(),
+        imdb: z.string().nullish(),
+        tmdb: z.number().int().nullish(),
+      }),
+    })
+    .nullish(),
+  attached_to: z
+    .object({
+      type: z.enum(['history', 'collection', 'rating']),
+      id: z.number().int().nullish(),
+    })
+    .nullish(),
+  notes: z.string(),
+  privacy: z.enum(['private', 'public', 'friends']).nullish(),
+  spoiler: z.boolean().nullish(),
+});
 
 const noteRequestSchema = z
   .object({
@@ -86,10 +118,21 @@ export const notes = builder.router(
     create: {
       summary: 'Add notes',
       description: `#### 🔒 OAuth Required 😁 Emojis
-Add a new note to a movie, show, season, episode, person, or list.`,
+Add a new note to a movie, show, season, episode, or person. Send the media object under its own key (\`movie\`, \`show\`, \`season\`, \`episode\`, or \`person\`) with its \`ids\`.
+
+To attach the note to a history, collection, or rating entry instead, also send \`attached_to\` with its \`type\` (\`history\`, \`collection\`, or \`rating\`). For \`history\`, send the history \`id\` and no media object. \`privacy\` and \`spoiler\` only apply to these attached notes.
+
+#### JSON POST Data
+| Key | Type | Value |
+|---|---|---|
+| \`movie\`, \`show\`, \`season\`, \`episode\`, \`person\` | object | Media object with \`ids\`. |
+| \`attached_to\` | object | Optional \`type\` and \`id\`. |
+| \`notes\` * | string | The note text. |
+| \`privacy\` | string | \`private\`, \`public\`, or \`friends\`. |
+| \`spoiler\` | boolean | Is this a spoiler? |`,
       path: '',
       method: 'POST',
-      body: noteRequestSchema,
+      body: noteCreateRequestSchema,
       responses: {
         201: noteResponseSchema,
       },
@@ -102,6 +145,8 @@ Add a new note to a movie, show, season, episode, person, or list.`,
   },
 );
 
+/** The note create request payload. */
+export type NoteCreateRequest = z.infer<typeof noteCreateRequestSchema>;
 /** The note request payload. */
 export type NoteRequest = z.infer<typeof noteRequestSchema>;
 /** The note response payload. */
